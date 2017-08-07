@@ -3,6 +3,97 @@ using UnityEngine;
 
 public static class ShapeRecognizer {
 
+
+    private static float goldenRatio = (-1 + Mathf.Sqrt(5)) / 2f;
+
+    /// <summary>
+    /// Returns the best match for the given shape fom the learnt templates.
+    /// </summary>
+    /// <param name="boundingBoxSizeUsed">The bounding box size used for the scaling. If not sure what it is leave it at 1f</param>
+    public static TemplateGroup.Template GetBestMatch(List<Vector2> points, TemplateGroup templates, float boundingBoxSizeUsed = 1f) {
+        int _bestAt = 0;
+        float _bestScore = float.MaxValue;
+
+        var templateList = templates.Templates;
+        if (templateList.Count == 0) return null;
+
+        for (int i = 0; i < templateList.Count; i++) {
+            float _currScore = PathDistanceAtBestAngle(points, templateList[i]);
+
+            if (_bestScore > _currScore) {
+                _bestScore = _currScore;
+                _bestAt = i;
+            }
+        }
+
+        // This minimum path-distance is converted to a[0..1] score
+        // _bestScore = 1 - _bestScore / (Mathf.Sqrt(2f * boundingBoxSizeUsed * boundingBoxSizeUsed) / 2f);
+
+        return templateList[_bestAt];
+    }
+
+    /// <summary>
+    /// Returns the best path distance of the given [minDeg..maxDeg] angle set.
+    /// If you are not sure what the inputs mean don't tinker with it.
+    /// It uses a Golden Search algorithm.
+    /// </summary>
+    private static float PathDistanceAtBestAngle(List<Vector2> points, TemplateGroup.Template template, float minDeg = -45,
+                                                 float maxDeg = 45, float deltaDeg = 2) {
+        // The strategy is Golden Section Search(GSS), an efficient
+        // algorithm that finds the minimum value in a range using the
+        // Golden Ratio
+
+        float _x1 = goldenRatio * minDeg + (1 - goldenRatio) * maxDeg;
+        float _f1 = PathDistanceAtAngle(points, template, Mathf.Deg2Rad * _x1);
+
+        float _x2 = goldenRatio * maxDeg + (1 - goldenRatio) * minDeg;
+        float _f2 = PathDistanceAtAngle(points, template, Mathf.Deg2Rad * _x2);
+
+        while (Mathf.Abs(maxDeg - minDeg) > deltaDeg) {
+            if (_f1 < _f2) {
+                maxDeg = _x2;
+                _x2 = _x1;
+                _f2 = _f1;
+
+                _x1 = goldenRatio * minDeg + (1 - goldenRatio) * maxDeg;
+                _f1 = PathDistanceAtAngle(points, template, Mathf.Deg2Rad * _x1);
+            } else {
+                minDeg = _x1;
+                _x1 = _x2;
+                _f1 = _f2;
+
+                _x2 = goldenRatio * maxDeg + (1 - goldenRatio) * minDeg;
+                _f2 = PathDistanceAtAngle(points, template, Mathf.Deg2Rad * _x2);
+            }
+        }
+
+        return Mathf.Min(_f1, _f2);
+    }
+    /// <summary>
+    /// Tha path distance of a shape and a template with the shape being at a given relative rotation
+    /// Points is compared to a template to find the average distance between corresponding points
+    /// </summary>
+    /// <param name="rad">Radian!!</param>
+    private static float PathDistanceAtAngle(List<Vector2> shape, TemplateGroup.Template template, float rad) {
+        return PathDistance(ShapeRecognizer.RotateListToAngle(shape, rad), template);
+    }
+    /// <summary>
+    /// Tha path distance of a shape and a template.
+    /// Points is compared to a template to find the average distance between corresponding points
+    /// </summary>
+    private static float PathDistance(List<Vector2> shape, TemplateGroup.Template template) {
+        int _pointCount = Mathf.Min(template.Points.Count, shape.Count);
+        float _currScore = 0;
+
+        for (int p = 0; p < _pointCount; p++) {
+            _currScore += Vector2.Distance(shape[p], template.Points[p]);
+        }
+
+        return _currScore / _pointCount;
+    }
+
+
+
     /// <summary>
     /// This function does every needed step to a list of points.
     /// </summary>
@@ -65,6 +156,8 @@ public static class ShapeRecognizer {
         float _radToRotate = Mathf.Atan(_dY / _dX);
 
         if (_dX < 0) _radToRotate += Mathf.PI;
+        
+        if (Mathf.Approximately(_radToRotate, 0f)) return points;
 
         return RotateListToAngle(points, -_radToRotate, _centroid);
     }
@@ -147,8 +240,10 @@ public static class ShapeRecognizer {
     /// </summary>
     public static Vector2 GetCentroidOfPoints(List<Vector2> points) {
         // Stole this right off wikipedia so not exactly sure how it works
+        // Not using it anymore because it didn't work for swipes
+        // But just gonna leave it here in case I need it
         Vector2 _centroid = new Vector2();
-        float _area = 0f;
+        /* float _area = 0f;
         float _a;
 
         int i;
@@ -169,7 +264,9 @@ public static class ShapeRecognizer {
         _area *= 0.5f;
         _centroid /= 6f * _area;
 
-        return _centroid;
+        return _centroid; */
+        for (int i = 0; i < points.Count; i++) _centroid += points[i];
+        return _centroid / points.Count;
     }
     /// <summary>
     /// The bounding box of the given shape
@@ -187,8 +284,8 @@ public static class ShapeRecognizer {
         }
 
         Vector2 _size = _max - _min;
-        _size.x = _size.x == 0f ? 0.1f : _size.x;
-        _size.y = _size.y == 0f ? 0.1f : _size.y;
+        _size.x = _size.x == 0f ? 1f : _size.x;
+        _size.y = _size.y == 0f ? 1f : _size.y;
         return new Rect(_min, _size);
     }
 }
