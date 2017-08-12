@@ -57,6 +57,7 @@ class BezierCurveEditor : Editor {
 
             // assign the new position
             curve.points[index] = handleTransform.InverseTransformPoint(_point);
+            Undo.FlushUndoRecordObjects();
         }
         return _point;
     }

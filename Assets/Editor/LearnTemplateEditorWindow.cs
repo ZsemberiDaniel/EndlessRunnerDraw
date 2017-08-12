@@ -81,7 +81,7 @@ public class LearnTemplateEditorWindow : EditorWindow {
         HandleUtility.Repaint();
     }
 
-    internal void SetTemplateGroup(TemplateGroup templateGroup) {
+    public void SetTemplateGroup(TemplateGroup templateGroup) {
         this.templateGroup = templateGroup;
     }
 }

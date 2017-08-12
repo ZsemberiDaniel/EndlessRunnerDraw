@@ -30,6 +30,10 @@ public class PlayerController : InputMonoBehaviour {
     /// </summary>
     private int lane = 0;
     private Coroutine laneMovingCoroutine;
+
+    [SerializeField]
+    private LevelComponent currentLevel;
+    float levelProgrssion = 0f;
     
     
     
@@ -52,9 +56,9 @@ public class PlayerController : InputMonoBehaviour {
     /// Moves the player's rigidbody
     /// </summary>
     private void MovePlayer() {
-        playerVelocity += transform.forward * maxSpeed;
+        levelProgrssion += Time.fixedDeltaTime / 20f;
 
-        rb.MovePosition(transform.position + playerVelocity * Time.fixedDeltaTime);
+        rb.MovePosition(currentLevel.GetPositionOnLane(levelProgrssion, lane));
     }
     
     /// <summary>
@@ -93,7 +97,10 @@ public class PlayerController : InputMonoBehaviour {
     protected override void Swipe(Vector2 from, Vector2 to, SwipeType type) {
         switch (type) {
             case SwipeType.left:
-                
+                lane--;
+                break;
+            case SwipeType.right:
+                lane++;
                 break;
         }
     }

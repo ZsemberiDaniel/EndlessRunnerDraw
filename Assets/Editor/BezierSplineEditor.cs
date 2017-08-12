@@ -1,20 +1,16 @@
 ﻿using System;
 using UnityEditor;
 using UnityEngine;
+using static BezierSplineSettingsWindow;
 
 [CustomEditor(typeof(BezierSpline))]
 class BezierSplineEditor : Editor {
 
-    // Settings
-    private int stepsPerCurve = 10;
-    private float directionScale = 0.5f;
-    private float handleSize = 0.1f;
-    private float pickSize = 0.01f;
     // How the handles in different modes should look like
     private static Tuple<Handles.CapFunction, Color>[] handleSettings = {
         Tuple.Create<Handles.CapFunction, Color>(Handles.CubeHandleCap, Color.white),
-        Tuple.Create<Handles.CapFunction, Color>(Handles.ConeHandleCap, Color.yellow),
-        Tuple.Create<Handles.CapFunction, Color>(Handles.SphereHandleCap, Color.cyan)
+        Tuple.Create<Handles.CapFunction, Color>(Handles.CubeHandleCap, Color.yellow),
+        Tuple.Create<Handles.CapFunction, Color>(Handles.CubeHandleCap, Color.cyan)
     };
 
     // Which point is selected
@@ -29,17 +25,20 @@ class BezierSplineEditor : Editor {
         handleTransform = spline.transform;
         // take unity's pivot rotation mode into consideration
         handleRotation = Tools.pivotRotation == PivotRotation.Local ? handleTransform.rotation : Quaternion.identity;
-    }
 
+        // make it visible even though it's not selected
+        SceneView.onSceneGUIDelegate += DrawSplineWithoutHandles;
+    }
     private void OnSceneGUI() {
         // show points with handles and transform them to world space
-        Vector3 _p0 = ShowPoint(0);
+        Vector3 _p3 = ShowPoint(spline.Length - 1);
 
         ShowDirections();
-        for (int i = 1; i < spline.Length; i += 3) {  
-            Vector3 _p1 = ShowPoint(i);
-            Vector3 _p2 = ShowPoint(i + 1);
-            Vector3 _p3 = ShowPoint(i + 2);
+        // Go through backwards so it doesn't freak out if we delete something
+        for (int i = spline.Length - 4; i >= 0; i -= 3) {
+            Vector3 _p0 = ShowPoint(i);
+            Vector3 _p1 = ShowPoint(i + 1);
+            Vector3 _p2 = ShowPoint(i + 2);
 
             // Draw the handle lines
             Handles.color = Color.gray;
@@ -47,26 +46,70 @@ class BezierSplineEditor : Editor {
             Handles.DrawLine(_p2, _p3);
 
             // draw out curve
-            Handles.DrawBezier(_p0, _p3, _p1, _p2, Color.red, null, 1.3f);
-            _p0 = _p3;
+            Handles.DrawBezier(_p0, _p3, _p1, _p2, spline.color, null, 1.3f);
+            _p3 = _p0;
+        }
+
+
+        // Handle shortcuts
+        Event e = Event.current;
+        if (e.type == EventType.KeyDown) {
+            if (e.keyCode == Settings.HotkeyNewCurve) {
+                AddNewCurve();
+            }
         }
     }
-
     public override void OnInspectorGUI() {
         if (selectedIndex >= 0 && selectedIndex < spline.Length) {
             DrawSelectedPointEditor();
         }
 
+        spline.color = EditorGUILayout.ColorField("Spline color", spline.color);
+
         // We'll be able to add new curves to the spline
         if (GUILayout.Button("Add Curve")) {
-            Undo.RecordObject(spline, "Add Curve");
-            spline.AddCurve();
-            EditorUtility.SetDirty(spline);
+            AddNewCurve();
         }
     }
 
+    private void AddNewCurve() {
+        Undo.RecordObject(spline, "Add Curve");
+        spline.AddCurve();
+        EditorUtility.SetDirty(spline);
+        Undo.FlushUndoRecordObjects();
+    }
+
+    /// <summary>
+    /// Draws the spline without the selectable handles
+    /// </summary>
+    private void DrawSplineWithoutHandles(SceneView sceneView) {
+        if (spline == null) {
+            SceneView.onSceneGUIDelegate -= DrawSplineWithoutHandles;
+
+            return;
+        }
+
+        // show points with handles and transform them to world space
+        Vector3 _p3 = handleTransform.TransformPoint(spline[spline.Length - 1]);
+
+        ShowDirections();
+        // Go through backwards so it doesn't freak out if we delete something
+        for (int i = spline.Length - 4; i >= 0; i -= 3) {
+            Vector3 _p0 = handleTransform.TransformPoint(spline[i]);
+            Vector3 _p1 = handleTransform.TransformPoint(spline[i + 1]);
+            Vector3 _p2 = handleTransform.TransformPoint(spline[i + 2]);
+
+            // draw out curve
+            Handles.DrawBezier(_p0, _p3, _p1, _p2, spline.color, null, 1.3f);
+            _p3 = _p0;
+        }
+    }
+
+    /// <summary>
+    /// Draws the inspector for the selected point
+    /// </summary>
     private void DrawSelectedPointEditor() {
-        GUILayout.Label("Selected Point", EditorStyles.boldLabel);
+        GUILayout.Label("Selected Point (" + selectedIndex + ")", EditorStyles.boldLabel);
 
         // Position
         EditorGUI.BeginChangeCheck();
@@ -76,6 +119,7 @@ class BezierSplineEditor : Editor {
             EditorUtility.SetDirty(spline);
 
             spline[selectedIndex] = _point;
+            Undo.FlushUndoRecordObjects();
         }
 
         // ControlPointMode
@@ -88,21 +132,77 @@ class BezierSplineEditor : Editor {
             EditorUtility.SetDirty(spline);
 
             spline.SetControlPointMode(selectedIndex, _mode);
+            Undo.FlushUndoRecordObjects();
+        }
+
+        // Remove button
+        if (GUILayout.Button("Remove point")) {
+            Undo.RecordObject(spline, "Removed curve");
+            EditorUtility.SetDirty(spline);
+
+            spline.RemoveCurve(selectedIndex);
+            Undo.FlushUndoRecordObjects();
         }
     }
 
-    private void ShowDirections() {
-        Handles.color = Color.green;
+    /// <summary>
+    /// Draws the directions of the bezier curve
+    /// </summary>
+    private void ShowDirections() { 
+        for (int i = 0; i < spline.CurveCount; i++) {
+            if (Settings.ShowSteps) { 
+                for (int s = 0; s < Settings.StepsPerCurve; s++) { 
+                    Vector3 _point = handleTransform.TransformPoint(Bezier.CubicGetPoint(
+                            spline[i * 3],
+                            spline[i * 3 + 1],
+                            spline[i * 3 + 2],
+                            spline[i * 3 + 3], (float) s / Settings.StepsPerCurve));
+                    Vector3 _pointDerivative = handleTransform.TransformDirection(Bezier.CubicGetFirstDerivative(
+                            spline[i * 3],
+                            spline[i * 3 + 1],
+                            spline[i * 3 + 2],
+                            spline[i * 3 + 3], (float) s / Settings.StepsPerCurve));
 
-        int _steps = spline.CurveCount * stepsPerCurve;
-        Vector3 _point;
-        for (int i = 0; i <= _steps; i++) {
-            _point = spline.GetPoint(i / (float) _steps);
+                    // which way is the middle point's right
+                    Vector3 _pointRight = (Quaternion.LookRotation(Vector3.right) * _pointDerivative).normalized;
+                    // which way is the middle point's left
+                    Vector3 _pointLeft = (Quaternion.LookRotation(Vector3.left) * _pointDerivative).normalized;
+                    // which way is up
+                    Vector3 _pointUp = Vector3.Cross(_pointLeft, _pointDerivative).normalized;
 
-            Handles.DrawLine(_point, _point + spline.GetDirection(i / (float) _steps) * directionScale);
+                    Handles.color = Color.blue;
+                    Handles.DrawLine(_point, _point + _pointUp * Settings.DirectionScale);
+                    Handles.color = Color.green;
+                    Handles.DrawLine(_point, _point + _pointLeft * Settings.DirectionScale);
+                    Handles.color = Color.red;
+                    Handles.DrawLine(_point, _point + _pointRight * Settings.DirectionScale);
+                }
+            }
+
+            if (Settings.ShowPivots) {
+                Vector3 _pivot;
+                // get pivot -> the intersection of the point normals at the start and end points
+                Math3D.LineLineIntersection(
+                    out _pivot,
+                    spline[i * 3],
+                    (Quaternion.LookRotation(Vector3.right) * Bezier.CubicGetFirstDerivative(spline[i * 3], spline[i * 3 + 1], spline[i * 3 + 2], spline[i * 3 + 3], 0.01f)).normalized,
+                    spline[i * 3 + 3],
+                    (Quaternion.LookRotation(Vector3.right) * Bezier.CubicGetFirstDerivative(spline[i * 3], spline[i * 3 + 1], spline[i * 3 + 2], spline[i * 3 + 3], 0.99f)).normalized
+                );
+                _pivot = handleTransform.TransformPoint(_pivot);
+
+                Handles.color = spline.color;
+
+                Handles.DrawLine(spline[i * 3], _pivot);
+                Handles.DrawLine(spline[i * 3 + 3], _pivot);
+                Handles.DrawWireCube(_pivot, new Vector3(1, 1, 1));
+            }
         }
     }
 
+    /// <summary>
+    /// Draws a point from the bezier curve
+    /// </summary>
     private Vector3 ShowPoint(int index) {
         // transform point to world space
         Vector3 _point = handleTransform.TransformPoint(spline[index]);
@@ -110,9 +210,9 @@ class BezierSplineEditor : Editor {
         // This method gives us a fixed screen size for a handle for any point in world space
         float _size = HandleUtility.GetHandleSize(_point);
         // This button will look like a white dot   when clicked will turn into the active point
-        var _handleSettings = BezierSplineEditor.handleSettings[(int) spline.GetControlPointMode(index)];
+        var _handleSettings = handleSettings[(int) spline.GetControlPointMode(index)];
         Handles.color = _handleSettings.Item2;
-        if (Handles.Button(_point, Quaternion.identity, _size * handleSize, _size * pickSize, _handleSettings.Item1)) {
+        if (Handles.Button(_point, Quaternion.identity, _size * Settings.HandleSize, _size * Settings.PickSize, _handleSettings.Item1)) {
             selectedIndex = index;
             Repaint();
         }
@@ -130,6 +230,7 @@ class BezierSplineEditor : Editor {
 
                 // assign the new position
                 spline[index] = handleTransform.InverseTransformPoint(_point);
+                Undo.FlushUndoRecordObjects();
             }
         }
         return _point;
