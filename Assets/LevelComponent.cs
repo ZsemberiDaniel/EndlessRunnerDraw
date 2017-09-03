@@ -5,7 +5,7 @@ using UnityEngine;
 namespace EndlessRunner {
     public class LevelComponent : MonoBehaviour {
 
-        [Tooltip("If true the middle lane will be expande to the other lanes")]
+        [Tooltip("If true the middle lane will be expanded to the other lanes")]
         [SerializeField]
         private bool expandMiddleLane = false;
 
@@ -23,7 +23,7 @@ namespace EndlessRunner {
         /// </summary>
         [SerializeField]
         private BezierSpline defaultLane;
-
+         
         [SerializeField]
         private BezierSpline[] lanes;
         public BezierSpline GetLaneAt(int index) {
@@ -32,6 +32,9 @@ namespace EndlessRunner {
         public int LaneCountReal { get { return lanes.Length; } }
 
         public Vector3 GetPositionOnLane(float t, int lane) {
+            if (lane < 0 || lane >= lanes.Length)
+                throw new ArgumentException("Lane " + lane + " does not exist!");
+
             return lanes[lane].EquidistGetPoint(t);
         }
 

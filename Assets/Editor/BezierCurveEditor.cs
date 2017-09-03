@@ -1,4 +1,5 @@
-﻿using UnityEditor;
+﻿using Bezier;
+using UnityEditor;
 using UnityEngine;
 
 namespace BezierEditor {

@@ -6,7 +6,7 @@ namespace Bezier {
     public class BezierSpline : MonoBehaviour {
 
         /// <summary>
-        /// To how many segments the spline should be split
+        /// To how many segments the spline should be split when calculatin equidistant points
         /// </summary>
         private int arcLengthQuality = 1000;
         public int ArcLengthQuality {
@@ -17,12 +17,26 @@ namespace Bezier {
         // Points and their accessors
         [SerializeField]
         private Vector3[] points;
-        public int Length {
+        /// <summary>
+        /// How many points there are in this spline
+        /// </summary>
+        public int PointCount {
             get { return points.Length; }
         }
+        /// <summary>
+        /// Changes a point's position in this spline
+        /// </summary>
+        /// <exception cref="IndexOutOfRangeException">When the given index does not exist in this spline</exception>
         public Vector3 this[int index] {
-            get { return points[index]; }
+            get {
+                if (index < 0 || index >= points.Length)
+                    throw new IndexOutOfRangeException("No such point in this spline (" + index + ")");
+                return points[index];
+            }
             set {
+                if (index < 0 || index >= points.Length)
+                    throw new IndexOutOfRangeException("No such point in this spline (" + index + ")");
+
                 // if moving middle point move the others with it
                 if (index % 3 == 0) {
                     Vector3 delta = value - points[index];
@@ -79,7 +93,7 @@ namespace Bezier {
         }
 
         /// <summary>
-        /// Return point on this bezier curve
+        /// Returns point on this bezier curve at <paramref name="t"/>
         /// </summary>
         public Vector3 GetPoint(float t) {
             int i;
@@ -93,8 +107,11 @@ namespace Bezier {
                 t -= i;
                 i *= 3;
             }
-            return transform.TransformPoint(Bezier.CubicGetPoint(points[i], points[i + 1], points[i + 2], points[i + 3], t));
+            return transform.TransformPoint(BezierMath.CubicGetPoint(points[i], points[i + 1], points[i + 2], points[i + 3], t));
         }
+        /// <summary>
+        /// Returns velocity on this bezier curve at <paramref name="t"/>
+        /// </summary>
         public Vector3 GetVelocity(float t) {
             int i;
             if (t >= 1f) {
@@ -106,16 +123,19 @@ namespace Bezier {
                 t -= i;
                 i *= 3;
             }
-            return transform.TransformPoint(Bezier.CubicGetFirstDerivative(points[i], points[i + 1], points[i + 2], points[i + 3], t)) -
+            return transform.TransformPoint(BezierMath.CubicGetFirstDerivative(points[i], points[i + 1], points[i + 2], points[i + 3], t)) -
                 transform.position; // Because it produces a velocity vector and not a point,
             // it should not be affected by the position of the curve, so we subtract that after transforming.
         }
+        /// <summary>
+        /// Returns velocity on this bezier curve at <paramref name="t"/> (basically normalized velocity)
+        /// </summary>
         public Vector3 GetDirection(float t) {
             return GetVelocity(t).normalized;
         }
 
         /// <summary>
-        /// Returns a point on this bezier curve with a constant velocity
+        /// Returns a point on this bezier curve with a constant velocity at <paramref name="u"/>
         /// </summary>
         public Vector3 EquidistGetPoint(float u) {
             float _targetArcLength = u * splineLength;
@@ -168,7 +188,14 @@ namespace Bezier {
             // make sure new points are enforced
             EnforceMode(points.Length - 4);
         }
+        /// <summary>
+        /// Removes curve with index <paramref name="index"/>
+        /// </summary>
+        /// <exception cref="IndexOutOfRangeException">Thrown if there is no curve with given <paramref name="index"/></exception>
         public void RemoveCurve(int index) {
+            if (index < 0 || index >= CurveCount)
+                throw new IndexOutOfRangeException("No curve with index " + index);
+
             int _modeIndex = (index + 1) / 3;
             int _middleIndex = _modeIndex * 3;
 
@@ -191,7 +218,6 @@ namespace Bezier {
         /// <summary>
         /// Enforces the modes from the array to this spline
         /// </summary>
-        /// <param name="index"></param>
         private void EnforceMode(int index) {
             int _modeIndex = (index + 1) / 3;
 
@@ -234,6 +260,15 @@ namespace Bezier {
             }
         }
 
+        /// <summary>
+        /// Shifts the spline with <paramref name="amount"/> distance and returns a new spline
+        /// </summary>
+        /// <param name="safeDist">
+        /// The max distance between the middle of the curves and their extreme points.
+        /// If your shifted curve has too many sharp edges try pumping this number up.
+        /// But beware because it causes it to have more points and thus decreasing performance.
+        /// </param>
+        /// <param name="newSpline">If you want the returned spline to be put into an already existing spline assign this parameter.</param>
         public BezierSpline GetShiftedSpline(float amount, float safeDist = 0.3f, BezierSpline newSpline = null) {
             BezierSpline _shiftedSpline;
             if (newSpline != null) {
@@ -258,7 +293,7 @@ namespace Bezier {
             Vector3 _p0 = points[0];
             Vector3 _p1, _p2, _p3;
             List<Vector3[]> _newPointsSpline = new List<Vector3[]>();
-            for (int i = 3; i < Length; i += 3) {
+            for (int i = 3; i < PointCount; i += 3) {
                 _p1 = points[i - 2];
                 _p2 = points[i - 1];
                 _p3 = points[i];
@@ -268,15 +303,15 @@ namespace Bezier {
                 {
                     float? _sol1, _sol2;
 
-                    Bezier.CubicGetRoots(_p0.x, _p1.x, _p2.x, _p3.x, out _sol1, out _sol2);
+                    BezierMath.CubicGetRoots(_p0.x, _p1.x, _p2.x, _p3.x, out _sol1, out _sol2);
                     if (_sol1.HasValue && _sol1.Value < 1 && _sol1.Value > 0) _solutions.Add(_sol1.Value);
                     if (_sol2.HasValue && _sol2.Value < 1 && _sol2.Value > 0) _solutions.Add(_sol2.Value);
 
-                    Bezier.CubicGetRoots(_p0.y, _p1.y, _p2.y, _p3.y, out _sol1, out _sol2);
+                    BezierMath.CubicGetRoots(_p0.y, _p1.y, _p2.y, _p3.y, out _sol1, out _sol2);
                     if (_sol1.HasValue && _sol1.Value < 1 && _sol1.Value > 0) _solutions.Add(_sol1.Value);
                     if (_sol2.HasValue && _sol2.Value < 1 && _sol2.Value > 0) _solutions.Add(_sol2.Value);
 
-                    Bezier.CubicGetRoots(_p0.z, _p1.z, _p2.z, _p3.z, out _sol1, out _sol2);
+                    BezierMath.CubicGetRoots(_p0.z, _p1.z, _p2.z, _p3.z, out _sol1, out _sol2);
                     if (_sol1.HasValue && _sol1.Value < 1 && _sol1.Value > 0) _solutions.Add(_sol1.Value);
                     if (_sol2.HasValue && _sol2.Value < 1 && _sol2.Value > 0) _solutions.Add(_sol2.Value);
                 }
@@ -292,7 +327,7 @@ namespace Bezier {
                     float _secondSize = 1f; // we need this to know how big the second curve is compared to the very first starting curve
                                            // so we can split at the right point
                     foreach(float sol in _solutions) {
-                        Bezier.CubicSplitCurve(_second[0], _second[1], _second[2], _second[3], _secondSize * sol, out _first, out _second);
+                        BezierMath.CubicSplitCurve(_second[0], _second[1], _second[2], _second[3], _secondSize * sol, out _first, out _second);
 
                         _secondSize *= (1f - sol);
                         _newPointsCurve.Add(_first);
@@ -307,7 +342,7 @@ namespace Bezier {
                     while (_at >= 0) {
                         Vector3[] _split1, _split2;
                         // where the curv t = 0.5f
-                        Vector3 _zeroDotFive = Bezier.CubicGetPoint(_newPointsCurve[_at][0], _newPointsCurve[_at][1],
+                        Vector3 _zeroDotFive = BezierMath.CubicGetPoint(_newPointsCurve[_at][0], _newPointsCurve[_at][1],
                             _newPointsCurve[_at][2], _newPointsCurve[_at][3], 0.5f);
                         // the center of the curve's 4 points
                         Vector3 _center = (_newPointsCurve[_at][0] + _newPointsCurve[_at][1] + _newPointsCurve[_at][2] + _newPointsCurve[_at][3]) / 4f;
@@ -315,7 +350,7 @@ namespace Bezier {
                         // if they are too far away
                         if (Vector3.Distance(_zeroDotFive, _center) > safeDist) {
                             // split curva at 0.5f
-                            Bezier.CubicSplitCurve(_newPointsCurve[_at][0], _newPointsCurve[_at][1], _newPointsCurve[_at][2], _newPointsCurve[_at][3], 0.5f,
+                            BezierMath.CubicSplitCurve(_newPointsCurve[_at][0], _newPointsCurve[_at][1], _newPointsCurve[_at][2], _newPointsCurve[_at][3], 0.5f,
                                 out _split1, out _split2);
 
                             // overwrite current curve
@@ -340,9 +375,9 @@ namespace Bezier {
                         bool _doIntersect = Math3D.LineLineIntersection(
                             out _pivot,
                             _newPointsCurve[k][0],
-                            (Quaternion.LookRotation(Vector3.right) * Bezier.CubicGetFirstDerivative(_newPointsCurve[k][0], _newPointsCurve[k][1], _newPointsCurve[k][2], _newPointsCurve[k][3], 0.01f)).normalized,
+                            (Quaternion.LookRotation(Vector3.right) * BezierMath.CubicGetFirstDerivative(_newPointsCurve[k][0], _newPointsCurve[k][1], _newPointsCurve[k][2], _newPointsCurve[k][3], 0.01f)).normalized,
                             _newPointsCurve[k][3],
-                            (Quaternion.LookRotation(Vector3.right) * Bezier.CubicGetFirstDerivative(_newPointsCurve[k][0], _newPointsCurve[k][1], _newPointsCurve[k][2], _newPointsCurve[k][3], 0.99f)).normalized
+                            (Quaternion.LookRotation(Vector3.right) * BezierMath.CubicGetFirstDerivative(_newPointsCurve[k][0], _newPointsCurve[k][1], _newPointsCurve[k][2], _newPointsCurve[k][3], 0.99f)).normalized
                         );
 
                         // scaling
@@ -354,7 +389,7 @@ namespace Bezier {
                                 _newPointsCurve[k][j] -= _whichWay * amount;
                         } else {
                             // cache this
-                            Vector3 _middleDerivative = Bezier.CubicGetFirstDerivative(
+                            Vector3 _middleDerivative = BezierMath.CubicGetFirstDerivative(
                                     _newPointsCurve[k][0],
                                     _newPointsCurve[k][1],
                                     _newPointsCurve[k][2],

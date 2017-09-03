@@ -7,20 +7,31 @@ namespace Bezier {
         public Vector3[] points;
 
         /// <summary>
-        /// Return point on this bezier curve
+        /// Return point on this bezier curve at <paramref name="t"/>
         /// </summary>
-        /// <param name="t">[0..1]</param>
+        /// <param name="t">Clamped to [0..1]</param>
         public Vector3 GetPoint(float t) {
-            return transform.TransformPoint(Bezier.CubicGetPoint(points[0], points[1], points[2], points[3], t));
+            t = Mathf.Clamp01(t);
+            return transform.TransformPoint(BezierMath.CubicGetPoint(points[0], points[1], points[2], points[3], t));
         }
 
+        /// <summary>
+        /// Returns the velocity of this bezier curve at <paramref name="t"/>
+        /// </summary>
+        /// <param name="t">Clamped to [0..1]</param>
         public Vector3 GetVelocity(float t) {
-            return transform.TransformPoint(Bezier.CubicGetFirstDerivative(points[0], points[1], points[2], points[3], t)) -
+            t = Mathf.Clamp01(t);
+            return transform.TransformPoint(BezierMath.CubicGetFirstDerivative(points[0], points[1], points[2], points[3], t)) -
                 transform.position; // Because it produces a velocity vector and not a point,
             // it should not be affected by the position of the curve, so we subtract that after transforming.
         }
 
+        /// <summary>
+        /// Returns the direction of this bezier curve at <paramref name="t"/> (basically the normalized velocity)
+        /// </summary>
+        /// <param name="t">Clamped to [0..1]</param>
         public Vector3 GetDirection(float t) {
+            t = Mathf.Clamp01(t);
             return GetVelocity(t).normalized;
         }
 

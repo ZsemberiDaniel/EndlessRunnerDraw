@@ -1,5 +1,6 @@
 ﻿using System.Collections.Generic;
 using UnityEngine;
+using System;
 
 namespace OneDollar {
     public static class ShapeRecognizer {
@@ -10,7 +11,13 @@ namespace OneDollar {
         /// Returns the best match for the given shape fom the learnt templates.
         /// </summary>
         /// <param name="boundingBoxSizeUsed">The bounding box size used for the scaling. If not sure what it is leave it at 1f</param>
+        /// <exception cref="ArgumentNullException">Thrown if either <paramref name="points"/> or <paramref name="templates"/> is null</exception>
         public static TemplateGroup.Template GetBestMatch(List<Vector2> points, TemplateGroup templates, float boundingBoxSizeUsed = 1f) {
+            if (points == null) throw new ArgumentNullException("Points list cannot be null!");
+            if (templates == null) throw new ArgumentNullException("Templategroup cannot be null");
+
+            boundingBoxSizeUsed = Mathf.Abs(boundingBoxSizeUsed);
+
             int _bestAt = 0;
             float _bestScore = float.MaxValue;
 
@@ -37,8 +44,21 @@ namespace OneDollar {
         /// If you are not sure what the inputs mean don't tinker with it.
         /// It uses a Golden Search algorithm.
         /// </summary>
+        /// <param name="deltaDeg">What the tolerance from the perfect angle is</param>
+        /// <exception cref="ArgumentNullException">If either <paramref name="points"/> or <paramref name="template"/> is null</exception>
         private static float PathDistanceAtBestAngle(List<Vector2> points, TemplateGroup.Template template, float minDeg = -45,
                                                      float maxDeg = 45, float deltaDeg = 2) {
+            if (points == null) throw new ArgumentNullException("Points list cannot be null!");
+            if (template == null) throw new ArgumentNullException("Template cannot be null");
+
+            // swap them if minDeg is larger than maxDeg
+            if (maxDeg < minDeg) {
+                float temp = minDeg;
+                minDeg = maxDeg;
+                maxDeg = temp;
+            }
+            deltaDeg = Mathf.Abs(deltaDeg);
+
             // The strategy is Golden Section Search(GSS), an efficient
             // algorithm that finds the minimum value in a range using the
             // Golden Ratio
@@ -74,14 +94,23 @@ namespace OneDollar {
         /// Points is compared to a template to find the average distance between corresponding points
         /// </summary>
         /// <param name="rad">Radian!!</param>
+        /// <exception cref="ArgumentNullException">Thrown if either shape or template is null</exception>
         private static float PathDistanceAtAngle(List<Vector2> shape, TemplateGroup.Template template, float rad) {
-            return PathDistance(ShapeRecognizer.RotateListToAngle(shape, rad), template);
+            if (shape == null) throw new ArgumentNullException("Shape cannot be null!");
+            if (template == null) throw new ArgumentNullException("Tempalte cannot be null!");
+
+            return PathDistance(RotateListToAngle(shape, rad), template);
         }
+
         /// <summary>
         /// Tha path distance of a shape and a template.
         /// Points is compared to a template to find the average distance between corresponding points
         /// </summary>
+        /// <exception cref="ArgumentNullException">Thrown if either shape or template is null</exception>
         private static float PathDistance(List<Vector2> shape, TemplateGroup.Template template) {
+            if (shape == null) throw new ArgumentNullException("Shape cannot be null!");
+            if (template == null) throw new ArgumentNullException("Template cannot ben null!");
+
             int _pointCount = Mathf.Min(template.Points.Count, shape.Count);
             float _currScore = 0;
 
@@ -95,9 +124,12 @@ namespace OneDollar {
 
 
         /// <summary>
-        /// This function does every needed step to a list of points.
+        /// This function does every needed step to a list of points so they are in perfect shape ( ha ) to be stored
         /// </summary>
+        /// <exception cref="ArgumentNullException">Thrown if points is null</exception>
         public static List<Vector2> DoEverything(List<Vector2> points) {
+            if (points == null) throw new ArgumentNullException("Points cannot be null!");
+
             points = ResampleListToEquidistantPoints(points);
             points = TranslatePointsToOrigin(points);
             points = RotateListToZero(points, GetCentroidOfPoints(points));
@@ -110,7 +142,10 @@ namespace OneDollar {
         /// Translates the list of points so it's centroid is the origin
         /// </summary>
         /// <param name="centroid">Pass it in if you have a precalculated centroid points</param>
+        /// <exception cref="ArgumentNullException">Points cannot be null</exception>
         public static List<Vector2> TranslatePointsToOrigin(List<Vector2> points, Vector2? centroid = null) {
+            if (points == null) throw new ArgumentNullException("Points cannot be null!");
+
             List<Vector2> _newPoints = new List<Vector2>();
 
             Vector2 _centroid = centroid.HasValue ? centroid.Value : GetCentroidOfPoints(points);
@@ -120,11 +155,15 @@ namespace OneDollar {
 
             return _newPoints;
         }
+
         /// <summary>
         /// Scales the list of points so it fits in a size*size square
         /// </summary>
         /// <param name="rect">Pass it in if you have a precalculated bounding rect</param>
+        /// <exception cref="ArgumentNullException">Points cannot be null</exception>
         public static List<Vector2> ScalePointsToSquare(List<Vector2> points, float size = 1f, Rect? rect = null) {
+            if (points == null) throw new ArgumentNullException("Points cannot be null!");
+
             List<Vector2> _newPoints = new List<Vector2>();
 
             Rect _rect = rect.HasValue ? rect.Value : GetBoindgBoxOfPoints(points);
@@ -139,11 +178,15 @@ namespace OneDollar {
 
             return _newPoints;
         }
+
         /// <summary>
         /// Rotates the list of points so the first point is looking towards zero (-> this way)
         /// </summary>
         /// <param name="centroid">Pass it in if you have a precalculated centroid points</param>
+        /// <exception cref="ArgumentNullException">Points cannot be null</exception>
         public static List<Vector2> RotateListToZero(List<Vector2> points, Vector2? centroid = null) {
+            if (points == null) throw new ArgumentNullException("Points cannot be null!");
+
             // We have no points to rotate
             if (points == null || points.Count == 0) return null;
 
@@ -161,11 +204,15 @@ namespace OneDollar {
 
             return RotateListToAngle(points, -_radToRotate, _centroid);
         }
+
         /// <summary>
         /// Rotates list to given angle. The given angle has to be in radian!
         /// </summary>
         /// <param name="centroid">Pass it in if you have a precalculated centroid points</param>
+        /// <exception cref="ArgumentNullException">Points cannot be null</exception>
         public static List<Vector2> RotateListToAngle(List<Vector2> points, float rad, Vector2? centroid = null) {
+            if (points == null) throw new ArgumentNullException("Points cannot be null!");
+
             List<Vector2> _newPoints = new List<Vector2>();
 
             // used for further calculation
@@ -185,10 +232,14 @@ namespace OneDollar {
 
             return _newPoints;
         }
+
         /// <summary>
         /// Resamples the given points list so it has pointCount points equidistant from each other
         /// </summary>
+        /// <exception cref="ArgumentNullException">Points cannot be null</exception>
         public static List<Vector2> ResampleListToEquidistantPoints(List<Vector2> points, int pointCount = 64) {
+            if (points == null) throw new ArgumentNullException("Points cannot be null!");
+
             // We have no points to resample
             if (points == null || points.Count == 0) return null;
 
@@ -238,7 +289,10 @@ namespace OneDollar {
         /// <summary>
         /// The centroid points of the given shape
         /// </summary>
+        /// <exception cref="ArgumentNullException">Points cannot be null</exception>
         public static Vector2 GetCentroidOfPoints(List<Vector2> points) {
+            if (points == null) throw new ArgumentNullException("Points cannot be null!");
+
             // Stole this right off wikipedia so not exactly sure how it works
             // Not using it anymore because it didn't work for swipes
             // But just gonna leave it here in case I need it
@@ -271,7 +325,10 @@ namespace OneDollar {
         /// <summary>
         /// The bounding box of the given shape
         /// </summary>
+        /// <exception cref="ArgumentNullException">Points cannot be null</exception>
         public static Rect GetBoindgBoxOfPoints(List<Vector2> points) {
+            if (points == null) throw new ArgumentNullException("Points cannot be null!");
+
             Vector2 _min = points[0];
             Vector2 _max = points[0];
 

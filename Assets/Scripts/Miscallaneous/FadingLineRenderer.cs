@@ -1,17 +1,21 @@
 ﻿using UnityEngine;
+using System.Collections.Generic;
 
+/// <summary>
+/// A LineRenderer which fades after a while
+/// </summary>
 [RequireComponent(typeof(LineRenderer))]
 public class FadingLineRenderer : MonoBehaviour {
 
     private LineRenderer lineRenderer;
 
-    private ExpandingArray<float> addedAt = new ExpandingArray<float>(32);
+    private List<float> addedAt = new List<float>(32);
 
     [Tooltip("After how much time the points should disappear")]
     [SerializeField]
     private float fadeTime = 0.5f;
     
-	void Start() {
+	private void Start() {
         lineRenderer = GetComponent<LineRenderer>();
 
         if (fadeTime <= 0) {
@@ -49,8 +53,11 @@ public class FadingLineRenderer : MonoBehaviour {
         addedAt[lineRenderer.positionCount - 1] = Time.time;
     }
     
+    /// <summary>
+    /// Completely resets the linerenderer
+    /// </summary>
     public void Reset() {
         lineRenderer.positionCount = 0;
-        for (int i = 0; i < addedAt.Length; i++) addedAt[i] = 0;
+        for (int i = 0; i < addedAt.Count; i++) addedAt[i] = 0;
     }
 }

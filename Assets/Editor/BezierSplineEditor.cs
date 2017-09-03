@@ -1,7 +1,9 @@
-﻿using System;
+﻿using Bezier;
+using EndlessRunner;
+using System;
 using UnityEditor;
 using UnityEngine;
-using static BezierSplineSettingsWindow;
+using static BezierEditor.BezierSplineSettingsWindow;
 
 namespace BezierEditor {
     [CustomEditor(typeof(BezierSpline))]
@@ -53,10 +55,10 @@ namespace BezierEditor {
             if (spline == null) return;
 
             // show points with handles and transform them to world space
-            Vector3 _p3 = spline.transform.TransformPoint(spline[spline.Length - 1]);
+            Vector3 _p3 = spline.transform.TransformPoint(spline[spline.PointCount - 1]);
 
             // Go through backwards so it doesn't freak out if we delete something
-            for (int i = spline.Length - 4; i >= 0; i -= 3) {
+            for (int i = spline.PointCount - 4; i >= 0; i -= 3) {
                 Vector3 _p0 = spline.transform.TransformPoint(spline[i]);
                 Vector3 _p1 = spline.transform.TransformPoint(spline[i + 1]);
                 Vector3 _p2 = spline.transform.TransformPoint(spline[i + 2]);
@@ -83,11 +85,11 @@ namespace BezierEditor {
         }
         private void OnSceneGUI() {
             // show points with handles and transform them to world space
-            Vector3 _p3 = ShowPoint(spline.Length - 1);
+            Vector3 _p3 = ShowPoint(spline.PointCount - 1);
 
             ShowDirections();
             // Go through backwards so it doesn't freak out if we delete something
-            for (int i = spline.Length - 4; i >= 0; i -= 3) {
+            for (int i = spline.PointCount - 4; i >= 0; i -= 3) {
                 Vector3 _p0 = ShowPoint(i);
                 Vector3 _p1 = ShowPoint(i + 1);
                 Vector3 _p2 = ShowPoint(i + 2);
@@ -117,7 +119,7 @@ namespace BezierEditor {
                 isParentLevelComponent = spline.GetComponentInParent<LevelComponent>() != null;
             }
 
-            if (selectedIndex >= 0 && selectedIndex < spline.Length) {
+            if (selectedIndex >= 0 && selectedIndex < spline.PointCount) {
                 DrawSelectedPointEditor();
             }
 
@@ -154,11 +156,11 @@ namespace BezierEditor {
             }
 
             // show points with handles and transform them to world space
-            Vector3 _p3 = handleTransform.TransformPoint(spline[spline.Length - 1]);
+            Vector3 _p3 = handleTransform.TransformPoint(spline[spline.PointCount - 1]);
 
             ShowDirections();
             // Go through backwards so it doesn't freak out if we delete something
-            for (int i = spline.Length - 4; i >= 0; i -= 3) {
+            for (int i = spline.PointCount - 4; i >= 0; i -= 3) {
                 Vector3 _p0 = handleTransform.TransformPoint(spline[i]);
                 Vector3 _p1 = handleTransform.TransformPoint(spline[i + 1]);
                 Vector3 _p2 = handleTransform.TransformPoint(spline[i + 2]);
@@ -216,12 +218,12 @@ namespace BezierEditor {
             for (int i = 0; i < spline.CurveCount; i++) {
                 if (Settings.ShowSteps) { 
                     for (int s = 0; s < Settings.StepsPerCurve; s++) { 
-                        Vector3 _point = handleTransform.TransformPoint(Bezier.CubicGetPoint(
+                        Vector3 _point = handleTransform.TransformPoint(Bezier.BezierMath.CubicGetPoint(
                                 spline[i * 3],
                                 spline[i * 3 + 1],
                                 spline[i * 3 + 2],
                                 spline[i * 3 + 3], (float) s / Settings.StepsPerCurve));
-                        Vector3 _pointDerivative = handleTransform.TransformDirection(Bezier.CubicGetFirstDerivative(
+                        Vector3 _pointDerivative = handleTransform.TransformDirection(Bezier.BezierMath.CubicGetFirstDerivative(
                                 spline[i * 3],
                                 spline[i * 3 + 1],
                                 spline[i * 3 + 2],
@@ -249,9 +251,9 @@ namespace BezierEditor {
                     Math3D.LineLineIntersection(
                         out _pivot,
                         spline[i * 3],
-                        (Quaternion.LookRotation(Vector3.right) * Bezier.CubicGetFirstDerivative(spline[i * 3], spline[i * 3 + 1], spline[i * 3 + 2], spline[i * 3 + 3], 0.01f)).normalized,
+                        (Quaternion.LookRotation(Vector3.right) * Bezier.BezierMath.CubicGetFirstDerivative(spline[i * 3], spline[i * 3 + 1], spline[i * 3 + 2], spline[i * 3 + 3], 0.01f)).normalized,
                         spline[i * 3 + 3],
-                        (Quaternion.LookRotation(Vector3.right) * Bezier.CubicGetFirstDerivative(spline[i * 3], spline[i * 3 + 1], spline[i * 3 + 2], spline[i * 3 + 3], 0.99f)).normalized
+                        (Quaternion.LookRotation(Vector3.right) * Bezier.BezierMath.CubicGetFirstDerivative(spline[i * 3], spline[i * 3 + 1], spline[i * 3 + 2], spline[i * 3 + 3], 0.99f)).normalized
                     );
                     _pivot = handleTransform.TransformPoint(_pivot);
 

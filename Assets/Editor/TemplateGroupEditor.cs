@@ -2,6 +2,7 @@
 using UnityEngine;
 using System.Collections.Generic;
 using System.Linq;
+using OneDollar;
 
 namespace OneDollarEditor {
     [CustomEditor(typeof(TemplateGroup))]
